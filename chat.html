@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>웹소켓</title>
+        <meta charset="utf-8">
+    </head>
+    <body>
+        hi
+        <div id="clockDiv"></div>
+        <script>
+            window.onload = function(){
+                var ws = new WebSocket('ws://localhost:808');
+                ws.onopen = function(){
+                    alert('접속 성공');
+                }
+                // onmessage message event 발생 -> message 가 들어왔다.
+                ws.onmessage = function(evt){
+                    console.log(evt.data);
+                }
+            }
+        </script>
+    </body>
+</html>
