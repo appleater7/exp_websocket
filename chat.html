@@ -5,7 +5,9 @@
         <meta charset="utf-8">
     </head>
     <body>
-        hi
+        <!-- <input id="date" type="datetime-local"> -->
+        <!-- <button onclick="setTimer()">타이머</button> -->
+        <!-- <div id="timerDiv"></div> -->
         <div id="clockDiv"></div>
         <script>
             window.onload = function(){
@@ -15,7 +17,36 @@
                 }
                 // onmessage message event 발생 -> message 가 들어왔다.
                 ws.onmessage = function(evt){
-                    console.log(evt.data);
+                    document.querySelector('#clockDiv').innerHTML = evt.data;
+                }
+            }
+            function setTimer(){
+                // var startDate = new Date();
+                // var setDate = new Date();
+                // var ws = new WebSocket('ws://localhost:808');
+                // // 2019-01-01T01:00
+
+                // var tmp = document.querySelector('#date').value + '';
+                // setDate.setFullYear(Number.parseInt(tmp.substring(0,4)),
+                // Number.parseInt(tmp.substring(6,8)),
+                // Number.parseInt(tmp.substring(9,11)));
+                // setDate.setHours(Number.parseInt(tmp.substring(12,14)),
+                // Number.parseInt(tmp.substring(15)),00);
+                // setDate = tmp;
+
+                ws.onopen = function(){
+                    alert('접속 성공');
+                }
+                // onmessage message event 발생 -> message 가 들어왔다.
+                ws.onmessage = function(evt){
+                    console.log(evt.value);
+                    // serverDate = new Date(evt.data);
+                    // console.log('startDate');
+                    // console.log(startDate);
+                    // console.log('setDate');
+                    // console.log(setDate);
+                    // console.log('serverDate');
+                    // console.log(serverDate);
                 }
             }
         </script>
