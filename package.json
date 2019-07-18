@@ -11,6 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.17.1",
+    "mariadb": "^2.1.0",
+    "mybatis-mapper": "^0.6.3",
     "ws": "^7.1.0"
   }
 }
