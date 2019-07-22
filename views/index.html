@@ -1,32 +1,217 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>사원리스트</title>
-    </head>
-    <style>
-    .btns{
-        text-align:right;
-    }
-    </style>
-    <script src="/views/js/grid-obj.js"></script>
-    <body>
-        <!-- 'data-' 는 커스텀 어트리뷰트를 선언하기위한 약속이다. -->
-        <div id="grid" 
-        data-headers="ui_num,ui_name,ui_dept,ui_active"
-        data-lables="번호,사원명,부서,상태"
-        data-types="ro,ed,ed,ro"></div>
-        <div class="btns">
-            <button id="insert" onclick="addRow()">추가</button>
-            <button id="save">저장</button>
-        </div>
-        <script>            
-            var go = new GridObj('#grid');
-            go.select('/users');
-            go.init();
 
-            function addRow(){
-                go.addRow();
+<head>
+    <title>사원리스트</title>
+    <style>
+        .btns {
+            text-align: right;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="grid" data-headers="ui_num,ui_name,ui_dept,ui_active" data-labels="번호,사원명,부서,상태"
+            data-types="ro,ed,ed,ro" data-btns="add,save"></div>
+        <div class="btns">
+            <button onclick="addRow()">추가</button>
+            <button onclick="saveData()">저장</button>
+        </div>
+    </div>
+
+    <script>
+        //GridObj  선언
+        var GridObj = function (id) {
+            //id없이 객체 생성할 경우 에러 선언.
+            if (!id) {
+                throw 'id가 없을 경우 객체를 찾을 수 없습니다.';
             }
-        </script>
-    </body>
+            //grid를 그릴 div객체 생성
+            var obj = document.querySelector(id);
+            //헤더정보가져오기(서버에서 받아오는 컬러이름들)
+            var headers = obj.getAttribute('data-headers').split(',');
+            //화면에 보여질 정보 가져오기(화면에 보여지는 컬럼 이름들)
+            var labels = obj.getAttribute('data-labels').split(',');
+            //데이터의 수정가능여부(ex. ro : readonly, ed :edit)
+            var types = obj.getAttribute('data-types').split(',');
+            //서버에서 받을 데이터를 저장하는 변수
+            var dataset = {};
+            //데이터를 그릴 tbody object
+            var bodyObj;
+
+            //그리드에 row를 추가한다.
+            this.addRow = function () {
+                var rId = dataset.length;
+                var html = '<tr id="r' + rId + '">';
+                var data = {};
+                for (var tIdx in types) {
+                    data[headers[tIdx]] = '';
+                    if (types[tIdx] === 'ro') {
+                        html += '<td>&nbsp;</td>';
+                    } else if (types[tIdx] === 'ed') {
+                        html += '<td><input type="text" id="' + headers[tIdx] + '"></td>';
+                    }
+                }
+                html += '<td><button>삭제</button></td>'
+                html += '</tr>';
+                bodyObj.innerHTML += html;
+                /*
+                화면에서만 추가하는게 아니라 dataset에도 추가해야 하는데
+                아래처럼 해당 데이터의 status는 insert됬다는 의미로 I로 fix시킴
+                */
+                data.status = 'I';
+                dataset.push(data);
+            }
+
+            //그리그 컬럼 초기화
+            this.init = function () {
+                var html = '<table border="1">';
+                html += '<thead>';
+                html += '<tr>';
+                for (var idx in labels) {
+                    html += '<th>' + labels[idx] + '</th>';
+                }
+                html += '<th>삭제</th>';
+                html += '</tr>';
+                html += '</thead>';
+                html += '<tbody></tbody>';
+                html += '</table>';
+                obj.innerHTML = html;
+                bodyObj = obj.querySelector('tbody');
+            }
+
+            //그리드 데이터 select
+            this.select = function (url) {
+                send(url, callback);
+                function callback(res) {
+                    //서버에서 받은 데이터를 dataset에 저장해둔다.
+                    dataset = JSON.parse(res);
+                    var html = '';
+                    for (var i in dataset) {
+                        html += '<tr id="r' + i + '">';
+                        var row = dataset[i];
+                        //변경전까지는 Read의 해당 로우의 상태를 R로 fix
+                        dataset[i].status = 'R';
+                        for (var hIdx in headers) {
+                            var header = headers[hIdx];
+                            var td = '<td>';
+                            if (types[hIdx] === 'ed') {
+                                td += '<input type="text" value="' + row[header] + '" id="' + header + '" >';
+                            } else if (types[hIdx] === 'ro') {
+                                td += row[header];
+                            }
+                            td += '</td>'
+                            html += td;
+                        }
+                        html += '<td><button>삭제</button></td>'
+                        html += '</tr>';
+                    }
+                    //만들어진 html을 init()메소드에서 만들어진 bodyObj 에 생성한다.
+                    bodyObj.innerHTML = html;
+                    //bodyObj에 이벤트를 setting 한다.
+                    initEvent(bodyObj);
+                }
+            }
+            this.save = function (data) {
+                var callback = (res) => {
+                    res = JSON.parse(res);
+                    alert('총성공 :' + res.success)
+                    this.select('/users');
+                }
+                send('/users/save', callback, JSON.stringify(data), 'POST');
+            }
+            var initEvent = function (obj) {
+                //예제로 onchange 이벤트만 셋팅했음.
+                obj.onchange = function (event) {
+                    var rId = event.target.parentElement.parentElement.id;
+                    rId = rId.substring(1);
+                    var targetObj = event.target;
+                    changeValue(rId, targetObj);
+                }
+                obj.onclick = function(event){
+                    var targetObj = event.target;
+                    var rId = targetObj.parentElement.parentElement.id;
+                    rId = rId.substring(1);
+                    if(targetObj.innerHTML == '삭제'){
+                        deleteValue(rId,targetObj);
+                    }
+                }
+            }
+            var deleteValue = function (rId, targetObj) {
+                //삭제 로우가 신규일경우 dataset자체에서 삭제한다.
+                if (dataset[rId].status == 'I') {
+                    dataset.splice(rId,1);
+                }else{
+                    //아닐 경우 상태값을 D로 바꾼다.
+                    dataset[rId].status = 'D';
+                }
+                //tbody영역에서 타켓오브젝트를 가지고 있는 tr을 삭제한다.
+                bodyObj.removeChild(targetObj.parentElement.parentElement);
+            }
+            var changeValue = function (rId, targetObj) {
+                //row데이타의 status가 'R'일 경우 'U'로 변경하여 Update된 로우임을 셋팅함.
+                if (dataset[rId].status == 'R') {
+                    dataset[rId].status = 'U'
+                }
+                var header = targetObj.id;
+                //원래 dataset이 가지고 있던것을 targetObj의 value로 바꿔줌.
+                dataset[rId][header] = targetObj.value;
+            }
+
+            //수정및 추가된 데이터리스트 전체를 가져오는 함수
+            this.getModifiedDatas = function () {
+                var datas = [];
+                for (var data of dataset) {
+                    //row데이터의 status가 'R'이 아닐경우 모두 datas에 저장함
+                    //후에 삭제 로직을 추가하더라도 status를 'D'로 할경우 해당 함수에서 추가됨.
+                    if (data.status != 'R') {
+                        datas.push(data);
+                    }
+                }
+                return datas;
+            }
+            //xhr을 호출하여 data를 전송하는 것을 send로 통일함.
+            var send = function (url, func, data, method) {
+                var xhr = new XMLHttpRequest();
+                //method paramater누락시 default 'GET'
+                if (!method) {
+                    method = 'GET';
+                }
+                xhr.open(method, url);
+                if (method != 'GET') {
+                    //method가 get이 아닐경우 json형태로 보낸다고 fix
+                    xhr.setRequestHeader('Content-Type', 'application/json;charset=utf-8');
+                }
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState == xhr.DONE) {
+                        if (xhr.status == 200) {
+                            func(xhr.response);
+                        }
+                    }
+                }
+                xhr.send(data);
+            }
+        }
+        function addRow() {
+            //그리드에 로우를신규로 추가하는 예제
+            go.addRow();
+        }
+        function saveData() {
+            //저장할 데이터를 가져와 콘솔에 출력하는 예제
+            var modifiedDatas = go.getModifiedDatas();
+            console.log(modifiedDatas);
+            //서버로 저장
+            go.save(modifiedDatas);
+        }
+        var go;
+        window.addEventListener('load',function(){
+            go = new GridObj('#grid');
+            go.init();
+            go.select('/users');
+        })
+
+    </script>
+</body>
+
 </html>

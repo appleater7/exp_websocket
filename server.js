@@ -1,79 +1,151 @@
-var exp = require('express');
-var ws = require('ws');
-var app = exp();
-var mybatis = require('mybatis-mapper');
-
+var express = require('express');
+var app = express();
+var bodyParser = require('body-parser');
 const mariadb = require('mariadb');
-const pool = mariadb.createPool(
-    { host: 'localhost',
-    port: '3306',
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+const pool = mariadb.createPool({
+    host: 'localhost',
     database: 'osf',
-    user: 'root', 
-    password: '12345678', 
-    connectionLimit: 5 });
-// mybatis.createMapper()
+    user: 'root',
+    password: '12345678',
+    connectionLimit: 5
+});
 
-app.get('/views/**', function(req,res){
-    res.sendFile(__dirname+req.url);
+app.get('/views/**',function(req,res){
+    res.sendFile(__dirname + req.url)
 })
-
-app.get('/users', function (req, res) {    
+app.get('/users', function (req, res) {
     pool.getConnection()
         .then(conn => {
-            conn.query("SELECT * from user_info")
+            conn.query("SELECT ui_num, ui_name, ui_dept, (case when ui_active=1 then '정상' else '퇴사' end) ui_active from user_info")
                 .then((rows) => {
-                    console.log(rows); //[ {val: 1}, meta: ... ]
                     res.json(rows);
-                })
-                .then((res) => {
-                    console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
                     conn.end();
                 })
                 .catch(err => {
-                    //handle error
+                    console.log(err);
                     conn.end();
-                })
+                });
         }).catch(err => {
-            //not connected
+            console.log(err);
         });
-})
-app.get('/logic', function (req, res) {    
+});
+app.post('/users/save', async function (req, res) {
+    let conn = await pool.getConnection();
+    try{
+        conn.beginTransaction();
+        var rows = 0;
+        for(let data of req.body){
+            let result;
+            if(data.status==='I'){
+                let param = [data.ui_name, data.ui_dept];
+                result = await conn.query("insert into user_info(ui_name,ui_dept) values(?,?)", param);
+            }else if(data.status==='U'){
+                let param = [data.ui_name, data.ui_dept, data.ui_num];
+                result = await conn.query("update user_info set ui_name=?,ui_dept=? where ui_num=?", param);
+            }else if(data.status==='D'){
+                let param = [data.ui_num];
+                result = await conn.query("update user_info set ui_active=0 where ui_num=?", param);
+            }
+            rows += result.affectedRows;
+        }
+        await conn.commit(()=>{
+            console.log('commit ok!');
+        })
+        await conn.end();
+        console.log(rows);
+        res.json({success:rows});
+    }catch(err){
+        conn.rollback(()=>{
+            console.log('commit ok!');
+            res.json(err);
+        })
+        console.log(err);
+        res.json(err);
+    }
+});
+app.post('/test', function (req, res) {
+    console.log(req.body);
+    let param = [req.body.num, req.body.name];
     pool.getConnection()
         .then(conn => {
-            conn.query("SELECT * from test_info")
-                .then((rows) => {
-                    console.log(rows); //[ {val: 1}, meta: ... ]
-                    res.json(rows);
-                })
-                .then((res) => {
-                    console.log(res); // { affectedRows: 1, insertId: 1, warningStatus: 0 }
+            conn.query("insert into test_info values(?,?)", param)
+                .then((result) => {
+                    res.json(result);
                     conn.end();
                 })
                 .catch(err => {
-                    //handle error
+                    console.log(err);
                     conn.end();
-                })
+                });
         }).catch(err => {
-            //not connected
+            console.log(err);
         });
 })
 
-app.get('/', function (req, res) {
-    res.sendfile(__dirname + '/chat.html');
-});
+app.post('/logic', async function (req, res) {
+    console.log(req.body);
+    let param = [req.body.num, req.body.name];
+    let conn = await pool.getConnection();
+    try{
+        conn.beginTransaction();
+        let rows = await conn.query("insert into test_info values(?,?)", param);
+        console.log(rows);
+        console.log('일단 1번은 성공!!');
+        rows += await conn.query("insert into test_info values(?,?)", param);
+        conn.commit(()=>{
+            console.log('commit ok!');
+        })
+        conn.end();
+        res.json(rows);
+    }catch(err){
+        conn.rollback(()=>{
+            console.log('commit ok!');
+        })
+        conn.end();
+        console.log(err);
+        res.json(err);
+    }
+})
 
-app.listen(82, function () {
-    console.log('express Start!');
-});
+app.put('/test/:num', function (req, res) {
+    let param = [req.body.name, req.params.num];
+    pool.getConnection()
+        .then(conn => {
+            conn.query("update test_info set name=? where num=?", param)
+                .then((result) => {
+                    res.json(result);
+                    conn.end();
+                })
+                .catch(err => {
+                    console.log(err);
+                    conn.end();
+                });
+        }).catch(err => {
+            console.log(err);
+        });
+})
 
-var websocket = new ws.Server({ port: 808 })
-websocket.on('connection', function (socket) {
-    console.log('ws connected!');
-    // WebSocket 에 메시지 이벤트를 발생시킴
-    setInterval(function () {
-        socket.send(new Date().toString());
-    }, 1000)
+app.delete('/test/:num', function (req, res) {
+    let param = [req.params.num];
+    pool.getConnection()
+        .then(conn => {
+            conn.query("delete from test_info where num=?", param)
+                .then((result) => {
+                    res.json(result);
+                    conn.end();
+                })
+                .catch(err => {
+                    console.log(err);
+                    conn.end();
+                });
+        }).catch(err => {
+            console.log(err);
+        });
+})
+app.listen(80, function () {
+    console.log('Example app listening on port 80!')
 });
-// websocket.on('listening', function(){
-
-// })
